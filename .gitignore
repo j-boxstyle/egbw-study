@@ -1,0 +1,7 @@
+# 著作権保護のため Canvas 教材の生PDF/テキストは公開しない
+materials/
+*.pdf
+study_site/_qtools/*.json
+.DS_Store
+/tmp/
+*.log
