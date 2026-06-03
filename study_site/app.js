@@ -96,6 +96,7 @@ function buildBlock(){
 /* ---------- rendering ---------- */
 function el(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function escM(s){ const e=esc(s); return window.renderMathInHtml?window.renderMathInHtml(e):e; }
 
 function renderQuiz(){
   renderFilters();
@@ -129,7 +130,7 @@ function renderQuestion(){
   let h='';
   h+=`<div class="qmeta">Q${quizState.index+1}/${quizState.block.length} ｜ <span class="badge">W${q.week} Ch${q.ch} ${esc(chTitle)}</span> <span class="src">${esc(q.source||'')}</span></div>`;
   if(q.fig) h+=`<div class="fig">${q.fig}</div>`;
-  h+=`<div class="qtext">${esc(q.q)}</div>`;
+  h+=`<div class="qtext">${escM(q.q)}</div>`;
   h+='<div class="opts">';
   q._opts.forEach((opt,i)=>{
     let cls='opt';
@@ -140,14 +141,14 @@ function renderQuestion(){
     }
     const letter=i===4?'?':String.fromCharCode(65+i);
     const onclick = answered ? '' : `onclick="selectOption(${i})"`;
-    h+=`<button class="${cls}" ${onclick}><span class="ol">${letter}</span><span>${esc(opt)}</span></button>`;
+    h+=`<button class="${cls}" ${onclick}><span class="ol">${letter}</span><span>${escM(opt)}</span></button>`;
   });
   h+='</div>';
   if(answered){
     const ok=r.chosen===q._ans, dk=r.chosen===4;
     h+=`<div class="result ${ok?'ok':(dk?'dk':'ng')}">${ok?'✅ 正解':(dk?'❓ わからない':'❌ 不正解')}</div>`;
-    h+=`<div class="exp"><b>解説</b><br>${esc(q.exp)}</div>`;
-    if(!ok && !dk && q._we && q._we[r.chosen]) h+=`<div class="we">あなたの選択の誤り: ${esc(q._we[r.chosen])}</div>`;
+    h+=`<div class="exp"><b>解説</b><br>${escM(q.exp)}</div>`;
+    if(!ok && !dk && q._we && q._we[r.chosen]) h+=`<div class="we">あなたの選択の誤り: ${escM(q._we[r.chosen])}</div>`;
     h+=`<div class="airow"><button class="btn ai" onclick="copyAnalysis(${q.id})">📋 分析プロンプト</button><button class="btn ai" onclick="copyVerify(${q.id})">🎯 確認テスト</button></div>`;
   }
   card.innerHTML=h;

@@ -66,6 +66,11 @@ main{max-width:780px;margin:0 auto;padding:14px}
 .gja{font-size:12.5px;color:var(--mut)}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#0b3b6b;color:#fff;border:1px solid var(--acc);border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:90%;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* inline math fractions (renderer) */
+.math-frac{display:inline-flex;flex-direction:column;vertical-align:-0.55em;text-align:center;margin:0 .18em;line-height:1.05}
+.math-frac>.mf-num{border-bottom:1.5px solid currentColor;padding:0 .35em 1px}
+.math-frac>.mf-den{padding:1px .35em 0}
+.math-frac sup,.math-frac sub{font-size:.75em}
 </style>
 <style>
 /* EGBW textbook tab CSS — scoped under #view-text (ported & compacted from accounting reference) */
@@ -301,6 +306,115 @@ window.QUESTIONS=[{"conceptId": "c5_elasticity_supply_calc", "ch": 5, "week": 1,
 
 </script>
 <script>
+/* EGBW lightweight math renderer — dependency-free. Stacks fractions, renders sup/sub,
+   beautifies symbols. Conservative: only converts a "/" into a fraction when BOTH sides are
+   math operands AND at least one side contains a digit or Δ — so prose like and/or, AD/AS,
+   Demand/Supply, buyer/seller is left untouched. */
+(function(){
+  var COMMON = {and:1,or:1,to:1,of:1,vs:1,the:1,at:1,in:1,on:1,by:1};
+  function stripParens(s){ s=s.trim(); while(/^\([^()]*\)$/.test(s)) s=s.slice(1,-1).trim(); return s; }
+  function hasDigitOrDelta(s){ return /[0-9Δ]/.test(s); }
+  // a real operand carries a digit, Δ, or a lowercase subscript (MUa, Pa, Qd) — blocks bare acronym pairs like AD/AS
+  function hasMathMark(s){ return /[0-9Δa-z]/.test(s); }
+  // is this token a math operand (a variable/number/paren-group), not a prose word?
+  function isOperand(raw){
+    var s=stripParens(raw).trim();
+    if(!s) return false;
+    if(/\s{2,}/.test(s)) return false;
+    // contains digit or Δ → operand
+    if(/[0-9Δ]/.test(s)) return true;
+    // leading % like %ΔX handled above (has Δ); plain %X:
+    if(/^%/.test(s)) return true;
+    // a single math symbol token: starts uppercase or %, short, with optional subscript letters
+    // accept: P, Q, MC, MR, TR, TC, MUa, Pa, Qd, Eps, GDP_old ... reject Title-case words (Demand, Supply, Before)
+    if(/^[A-Z][a-z]{2,}$/.test(s)) return false;          // Title word (Demand, Supply, Tax) → prose
+    if(/^[a-z]{2,}$/.test(s)) return false;                // lowercase word → prose
+    if(COMMON[s.toLowerCase()]) return false;
+    if(/\s/.test(s)) return false;                         // multi-word → prose
+    // identifier containing an uppercase letter but not a single Title-case word → math symbol
+    // (accepts P, MC, MR, GDP, MUa, GDP_old, AD, AS; rejects Demand, Supply, MySpace handled by digit/Δ gate)
+    if(/[A-Z]/.test(s) && /^%?[A-Za-z0-9_.Δ]+$/.test(s)) return true;
+    if(/^[%A-Za-zΔ][A-Za-z0-9_Δ]{0,4}$/.test(s)) return true; // short symbol like Pa, Qd
+    return false;
+  }
+  // split a string on the FIRST top-level "/" (respecting parentheses). returns [a,b] or null
+  function splitTopSlash(s){
+    var depth=0;
+    for(var i=0;i<s.length;i++){
+      var c=s[i];
+      if(c==='(') depth++;
+      else if(c===')') depth--;
+      else if(c==='/' && depth===0) return [s.slice(0,i), s.slice(i+1)];
+    }
+    return null;
+  }
+  // render a math operand: nested fraction + sup/sub
+  function renderOperand(raw){
+    var s=raw.trim();
+    var stripped=stripParens(s);
+    var parts=splitTopSlash(stripped);
+    if(parts && isOperand(parts[0]) && isOperand(parts[1]) && (hasMathMark(stripParens(parts[0]))||hasMathMark(stripParens(parts[1])))){
+      return frac(renderOperand(parts[0]), renderOperand(parts[1]));
+    }
+    return supsub(esc(stripped));
+  }
+  function frac(numHtml,denHtml){
+    return '<span class="math-frac"><span class="mf-num">'+numHtml+'</span><span class="mf-den">'+denHtml+'</span></span>';
+  }
+  function supsub(s){
+    // ^{...} or ^x  → superscript ; _{...} or _x → subscript
+    s=s.replace(/\^\{([^}]+)\}/g,'<sup>$1</sup>').replace(/\^([0-9A-Za-z]+)/g,'<sup>$1</sup>');
+    s=s.replace(/_\{([^}]+)\}/g,'<sub>$1</sub>').replace(/_([0-9A-Za-z]+)/g,'<sub>$1</sub>');
+    return s;
+  }
+  function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+
+  // candidate operand char-class for the inline scan
+  var OPND = "(?:\\([^()]*\\)|[%$]?[A-Za-zΔ0-9_.%\\-−+]+)";
+  var FRAC_RE = new RegExp("(^|[\\s=(>×·−)])("+OPND+")\\s*/\\s*("+OPND+")(?=$|[\\s=).,;:<×·])","g");
+
+  // process a single text segment (no HTML tags inside)
+  function processText(text){
+    return text.replace(FRAC_RE, function(m, lead, a, b){
+      // peel trailing sentence punctuation off b (keep it after the fraction); preserve decimals like 0.5
+      var tail='';
+      var tm=b.match(/[.,;:!?]+$/);  // a real decimal ends in a digit, so a trailing dot is always punctuation
+      if(tm){ tail=tm[0]; b=b.slice(0, b.length-tail.length); }
+      var ca=stripParens(a), cb=stripParens(b);
+      if(isOperand(a) && isOperand(b) && (hasMathMark(ca)||hasMathMark(cb))){
+        return lead + frac(renderOperand(a), renderOperand(b)) + tail;
+      }
+      return m; // leave prose slash untouched
+    });
+  }
+
+  // public: process an HTML string, transforming math only in text nodes (outside tags)
+  window.renderMathInHtml = function(html){
+    if(!html || (html.indexOf('/')<0 && html.indexOf('^')<0)) return html;
+    var out=''; var i=0; var n=html.length;
+    while(i<n){
+      var lt=html.indexOf('<', i);
+      if(lt<0){ out+=processText(html.slice(i)); break; }
+      out+=processText(html.slice(i, lt));
+      // skip preformatted code blocks verbatim
+      if(html.substr(lt,4).toLowerCase()==='<pre'){
+        var end=html.toLowerCase().indexOf('</pre>', lt);
+        if(end<0){ out+=html.slice(lt); break; }
+        out+=html.slice(lt, end+6); i=end+6; continue;
+      }
+      var gt=html.indexOf('>', lt);
+      if(gt<0){ out+=html.slice(lt); break; }
+      out+=html.slice(lt, gt+1);
+      i=gt+1;
+    }
+    return out;
+  };
+  // public: process a plain (already HTML-escaped) string
+  window.renderMathPlain = function(s){ return processText(s||''); };
+})();
+
+</script>
+<script>
 /* EGBW study site engine — vanilla JS. Source data: Canvas only. */
 'use strict';
 const Q = window.QUESTIONS || [];
@@ -399,6 +513,7 @@ function buildBlock(){
 /* ---------- rendering ---------- */
 function el(id){return document.getElementById(id);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function escM(s){ const e=esc(s); return window.renderMathInHtml?window.renderMathInHtml(e):e; }
 
 function renderQuiz(){
   renderFilters();
@@ -432,7 +547,7 @@ function renderQuestion(){
   let h='';
   h+=`<div class="qmeta">Q${quizState.index+1}/${quizState.block.length} ｜ <span class="badge">W${q.week} Ch${q.ch} ${esc(chTitle)}</span> <span class="src">${esc(q.source||'')}</span></div>`;
   if(q.fig) h+=`<div class="fig">${q.fig}</div>`;
-  h+=`<div class="qtext">${esc(q.q)}</div>`;
+  h+=`<div class="qtext">${escM(q.q)}</div>`;
   h+='<div class="opts">';
   q._opts.forEach((opt,i)=>{
     let cls='opt';
@@ -443,14 +558,14 @@ function renderQuestion(){
     }
     const letter=i===4?'?':String.fromCharCode(65+i);
     const onclick = answered ? '' : `onclick="selectOption(${i})"`;
-    h+=`<button class="${cls}" ${onclick}><span class="ol">${letter}</span><span>${esc(opt)}</span></button>`;
+    h+=`<button class="${cls}" ${onclick}><span class="ol">${letter}</span><span>${escM(opt)}</span></button>`;
   });
   h+='</div>';
   if(answered){
     const ok=r.chosen===q._ans, dk=r.chosen===4;
     h+=`<div class="result ${ok?'ok':(dk?'dk':'ng')}">${ok?'✅ 正解':(dk?'❓ わからない':'❌ 不正解')}</div>`;
-    h+=`<div class="exp"><b>解説</b><br>${esc(q.exp)}</div>`;
-    if(!ok && !dk && q._we && q._we[r.chosen]) h+=`<div class="we">あなたの選択の誤り: ${esc(q._we[r.chosen])}</div>`;
+    h+=`<div class="exp"><b>解説</b><br>${escM(q.exp)}</div>`;
+    if(!ok && !dk && q._we && q._we[r.chosen]) h+=`<div class="we">あなたの選択の誤り: ${escM(q._we[r.chosen])}</div>`;
     h+=`<div class="airow"><button class="btn ai" onclick="copyAnalysis(${q.id})">📋 分析プロンプト</button><button class="btn ai" onclick="copyVerify(${q.id})">🎯 確認テスト</button></div>`;
   }
   card.innerHTML=h;
@@ -681,6 +796,7 @@ window.EXAM_PROBLEMS=[{"id": "ep_w1_1", "week": 1, "title": "Externality, Tax an
 (function(){
 function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function renderConceptDiagram(){ return ''; } // no SVG diagrams in EGBW build
+function MATH(html){ return (window.renderMathInHtml ? window.renderMathInHtml(html) : html); }
 
 // ---- renderMd (ported verbatim) ----
 function renderMd(str) {
@@ -918,11 +1034,11 @@ function renderInlineQuiz(ch, afterIndex) {
   for (var q = 0; q < selected.length; q++) {
     var qu = selected[q]; var qDomId = domId + '-q' + q;
     html += '<div style="margin-bottom:18px;" id="' + qDomId + '-wrap">';
-    html += '<div class="iq-q">' + (q+1) + '. ' + escapeHtml(qu.q) + '</div>';
+    html += '<div class="iq-q">' + (q+1) + '. ' + MATH(escapeHtml(qu.q)) + '</div>';
     for (var o = 0; o < qu.opts.length; o++) {
-      html += '<div class="iq-opt" id="' + qDomId + '-o' + o + '" onclick="checkInlineAnswer(\'' + qDomId + '\',' + o + ',' + qu.ans + ')">' + String.fromCharCode(65+o) + '. ' + escapeHtml(qu.opts[o]) + '</div>';
+      html += '<div class="iq-opt" id="' + qDomId + '-o' + o + '" onclick="checkInlineAnswer(\'' + qDomId + '\',' + o + ',' + qu.ans + ')">' + String.fromCharCode(65+o) + '. ' + MATH(escapeHtml(qu.opts[o])) + '</div>';
     }
-    html += '<div class="iq-exp hidden" id="' + qDomId + '-exp">' + escapeHtml(qu.exp) + '</div>';
+    html += '<div class="iq-exp hidden" id="' + qDomId + '-exp">' + MATH(escapeHtml(qu.exp)) + '</div>';
     html += '</div>';
   }
   html += '</div>';
@@ -953,16 +1069,16 @@ function renderChapterContent(ch) {
     if (c.star) html += '<div class="star-badge">★ 試験重要</div>';
     html += '</div>';
     html += renderInlineGlossary(c.id, c.name);
-    if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 Scene</div><div>' + renderMd(c.scene) + '</div></div>';
-    if (c.compare) html += '<div style="margin:12px 0;">' + renderCompareTable(c.compare) + '</div>';
-    if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ Punchline</div><div class="punch-text">' + renderMd(c.punchline) + '</div></div>';
-    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN)</div><div>' + renderDefEN(c.defEN) + '</div></div>';
-    if (c.defJA) html += '<div class="def-block"><div class="section-label">📝 定義 (JA)</div><div>' + renderMd(c.defJA) + '</div></div>';
-    if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example</div><div>' + renderMd(c.example) + '</div></div>';
-    if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 Why It Matters</div><div>' + renderMd(c.whyNeeded) + '</div></div>';
+    if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 Scene</div><div>' + MATH(renderMd(c.scene)) + '</div></div>';
+    if (c.compare) html += '<div style="margin:12px 0;">' + MATH(renderCompareTable(c.compare)) + '</div>';
+    if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ Punchline</div><div class="punch-text">' + MATH(renderMd(c.punchline)) + '</div></div>';
+    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN)</div><div>' + MATH(renderDefEN(c.defEN)) + '</div></div>';
+    if (c.defJA) html += '<div class="def-block"><div class="section-label">📝 定義 (JA)</div><div>' + MATH(renderMd(c.defJA)) + '</div></div>';
+    if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example</div><div>' + MATH(renderMd(c.example)) + '</div></div>';
+    if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 Why It Matters</div><div>' + MATH(renderMd(c.whyNeeded)) + '</div></div>';
     if (c.mistakes && c.mistakes.length) {
       html += '<div class="mistakes-block"><div class="section-label" style="color:#ef4444;">⚠️ Common Mistakes</div>';
-      for (var m = 0; m < c.mistakes.length; m++) html += '<div>• ' + renderMd(c.mistakes[m]) + '</div>';
+      for (var m = 0; m < c.mistakes.length; m++) html += '<div>• ' + MATH(renderMd(c.mistakes[m])) + '</div>';
       html += '</div>';
     }
     if (c.memorize) html += '<div class="memorize-block"><div class="section-label">🧠 Memorize</div><div class="memorize-text">' + escapeHtml(c.memorize) + '</div></div>';
@@ -983,7 +1099,7 @@ function renderExamProblems(week) {
     html += '<div class="exam-card">';
     html += '<div class="exam-badge">' + escapeHtml(p.badge) + '</div>';
     html += '<div style="font-size:20px;font-weight:700;margin-bottom:12px;">' + escapeHtml(p.title) + '</div>';
-    html += '<div class="exam-scenario">' + escapeHtml(p.scenario).replace(/\n/g, '<br>') + '</div>';
+    html += '<div class="exam-scenario">' + MATH(escapeHtml(p.scenario).replace(/\n/g, '<br>')) + '</div>';
     if (p.transactions && p.transactions.length) {
       html += '<ul class="doit-items">';
       for (var t = 0; t < p.transactions.length; t++) html += '<li>' + escapeHtml(p.transactions[t]) + '</li>';
@@ -995,7 +1111,7 @@ function renderExamProblems(week) {
       html += '</ol>';
     }
     html += '<button class="exam-reveal" onclick="toggleExamSolution(this)">👁 解答を見る</button>';
-    html += '<div class="exam-solution"><div class="exam-sol-block">' + (p.solHtml || '') + '</div></div>';
+    html += '<div class="exam-solution"><div class="exam-sol-block">' + MATH(p.solHtml || '') + '</div></div>';
     html += '</div>';
   }
   html += '</div>';

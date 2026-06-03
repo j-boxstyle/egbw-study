@@ -66,6 +66,11 @@ main{max-width:780px;margin:0 auto;padding:14px}
 .gja{font-size:12.5px;color:var(--mut)}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#0b3b6b;color:#fff;border:1px solid var(--acc);border-radius:10px;padding:10px 16px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:90%;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* inline math fractions (renderer) */
+.math-frac{display:inline-flex;flex-direction:column;vertical-align:-0.55em;text-align:center;margin:0 .18em;line-height:1.05}
+.math-frac>.mf-num{border-bottom:1.5px solid currentColor;padding:0 .35em 1px}
+.math-frac>.mf-den{padding:1px .35em 0}
+.math-frac sup,.math-frac sub{font-size:.75em}
 </style>
 </head>
 <body>

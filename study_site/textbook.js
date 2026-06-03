@@ -3,6 +3,7 @@
 (function(){
 function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function renderConceptDiagram(){ return ''; } // no SVG diagrams in EGBW build
+function MATH(html){ return (window.renderMathInHtml ? window.renderMathInHtml(html) : html); }
 
 // ---- renderMd (ported verbatim) ----
 function renderMd(str) {
@@ -240,11 +241,11 @@ function renderInlineQuiz(ch, afterIndex) {
   for (var q = 0; q < selected.length; q++) {
     var qu = selected[q]; var qDomId = domId + '-q' + q;
     html += '<div style="margin-bottom:18px;" id="' + qDomId + '-wrap">';
-    html += '<div class="iq-q">' + (q+1) + '. ' + escapeHtml(qu.q) + '</div>';
+    html += '<div class="iq-q">' + (q+1) + '. ' + MATH(escapeHtml(qu.q)) + '</div>';
     for (var o = 0; o < qu.opts.length; o++) {
-      html += '<div class="iq-opt" id="' + qDomId + '-o' + o + '" onclick="checkInlineAnswer(\'' + qDomId + '\',' + o + ',' + qu.ans + ')">' + String.fromCharCode(65+o) + '. ' + escapeHtml(qu.opts[o]) + '</div>';
+      html += '<div class="iq-opt" id="' + qDomId + '-o' + o + '" onclick="checkInlineAnswer(\'' + qDomId + '\',' + o + ',' + qu.ans + ')">' + String.fromCharCode(65+o) + '. ' + MATH(escapeHtml(qu.opts[o])) + '</div>';
     }
-    html += '<div class="iq-exp hidden" id="' + qDomId + '-exp">' + escapeHtml(qu.exp) + '</div>';
+    html += '<div class="iq-exp hidden" id="' + qDomId + '-exp">' + MATH(escapeHtml(qu.exp)) + '</div>';
     html += '</div>';
   }
   html += '</div>';
@@ -275,16 +276,16 @@ function renderChapterContent(ch) {
     if (c.star) html += '<div class="star-badge">★ 試験重要</div>';
     html += '</div>';
     html += renderInlineGlossary(c.id, c.name);
-    if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 Scene</div><div>' + renderMd(c.scene) + '</div></div>';
-    if (c.compare) html += '<div style="margin:12px 0;">' + renderCompareTable(c.compare) + '</div>';
-    if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ Punchline</div><div class="punch-text">' + renderMd(c.punchline) + '</div></div>';
-    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN)</div><div>' + renderDefEN(c.defEN) + '</div></div>';
-    if (c.defJA) html += '<div class="def-block"><div class="section-label">📝 定義 (JA)</div><div>' + renderMd(c.defJA) + '</div></div>';
-    if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example</div><div>' + renderMd(c.example) + '</div></div>';
-    if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 Why It Matters</div><div>' + renderMd(c.whyNeeded) + '</div></div>';
+    if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 Scene</div><div>' + MATH(renderMd(c.scene)) + '</div></div>';
+    if (c.compare) html += '<div style="margin:12px 0;">' + MATH(renderCompareTable(c.compare)) + '</div>';
+    if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ Punchline</div><div class="punch-text">' + MATH(renderMd(c.punchline)) + '</div></div>';
+    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN)</div><div>' + MATH(renderDefEN(c.defEN)) + '</div></div>';
+    if (c.defJA) html += '<div class="def-block"><div class="section-label">📝 定義 (JA)</div><div>' + MATH(renderMd(c.defJA)) + '</div></div>';
+    if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example</div><div>' + MATH(renderMd(c.example)) + '</div></div>';
+    if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 Why It Matters</div><div>' + MATH(renderMd(c.whyNeeded)) + '</div></div>';
     if (c.mistakes && c.mistakes.length) {
       html += '<div class="mistakes-block"><div class="section-label" style="color:#ef4444;">⚠️ Common Mistakes</div>';
-      for (var m = 0; m < c.mistakes.length; m++) html += '<div>• ' + renderMd(c.mistakes[m]) + '</div>';
+      for (var m = 0; m < c.mistakes.length; m++) html += '<div>• ' + MATH(renderMd(c.mistakes[m])) + '</div>';
       html += '</div>';
     }
     if (c.memorize) html += '<div class="memorize-block"><div class="section-label">🧠 Memorize</div><div class="memorize-text">' + escapeHtml(c.memorize) + '</div></div>';
@@ -305,7 +306,7 @@ function renderExamProblems(week) {
     html += '<div class="exam-card">';
     html += '<div class="exam-badge">' + escapeHtml(p.badge) + '</div>';
     html += '<div style="font-size:20px;font-weight:700;margin-bottom:12px;">' + escapeHtml(p.title) + '</div>';
-    html += '<div class="exam-scenario">' + escapeHtml(p.scenario).replace(/\n/g, '<br>') + '</div>';
+    html += '<div class="exam-scenario">' + MATH(escapeHtml(p.scenario).replace(/\n/g, '<br>')) + '</div>';
     if (p.transactions && p.transactions.length) {
       html += '<ul class="doit-items">';
       for (var t = 0; t < p.transactions.length; t++) html += '<li>' + escapeHtml(p.transactions[t]) + '</li>';
@@ -317,7 +318,7 @@ function renderExamProblems(week) {
       html += '</ol>';
     }
     html += '<button class="exam-reveal" onclick="toggleExamSolution(this)">👁 解答を見る</button>';
-    html += '<div class="exam-solution"><div class="exam-sol-block">' + (p.solHtml || '') + '</div></div>';
+    html += '<div class="exam-solution"><div class="exam-sol-block">' + MATH(p.solHtml || '') + '</div></div>';
     html += '</div>';
   }
   html += '</div>';

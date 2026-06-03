@@ -9,6 +9,7 @@ shell=rd('shell.html')
 data='\n'.join([
  '<script>', rd('content.js'), '</script>',
  '<script>', rd('questions.js'), '</script>',
+ '<script>', rd('mathrender.js'), '</script>',
  '<script>', rd('app.js'), '</script>',
  '<script>', rd('textbook_data.js'), '</script>',
  '<script>', rd('textbook.js'), '</script>',
