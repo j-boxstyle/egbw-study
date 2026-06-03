@@ -10,8 +10,13 @@ data='\n'.join([
  '<script>', rd('content.js'), '</script>',
  '<script>', rd('questions.js'), '</script>',
  '<script>', rd('app.js'), '</script>',
+ '<script>', rd('textbook_data.js'), '</script>',
+ '<script>', rd('textbook.js'), '</script>',
 ])
 html=shell.replace('<!--DATA-->',data)
+# inject textbook CSS into <head>
+tbcss='<style>\n'+rd('textbook.css')+'\n</style>'
+html=html.replace('</head>', tbcss+'\n</head>')
 out=os.path.join(SITE,'index.html')
 with open(out,'w',encoding='utf-8') as f: f.write(html)
 print('wrote',out, round(os.path.getsize(out)/1024,1),'KB')
