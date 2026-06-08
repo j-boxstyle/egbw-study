@@ -6,17 +6,38 @@ function renderConceptDiagram(){ return ''; } // no SVG diagrams in EGBW build
 function MATH(html){ return (window.renderMathInHtml ? window.renderMathInHtml(html) : html); }
 // English definition → keyword chips (the bold key terms only). Falls back to sentence
 // bullets when there are too few bold terms, and to the rich renderer for tables/code.
-function renderDefKeywords(str){
+function renderDefKeywords(defEN, defJA){
+  var str=defEN||'';
   if(!str) return '';
   if(/```|(\n\s*\|)/.test(str)) return renderDefEN(str);
-  var seen={}, terms=[], m, re=/\*\*([^*]+)\*\*/g;
-  while((m=re.exec(str))!==null){
-    var t=m[1].trim(); var k=t.toLowerCase();
-    if(t && !seen[k]){ seen[k]=1; terms.push(t); }
+  var G=window.TB_GLOSSARY||[];
+  function gloss(term){
+    var tl=term.toLowerCase();
+    for(var i=0;i<G.length;i++){ if(G[i].term.toLowerCase()===tl) return G[i].def; }
+    for(var j=0;j<G.length;j++){ var gt=G[j].term.toLowerCase(); if(gt.length>4 && (tl.indexOf(gt)>=0||gt.indexOf(tl)>=0)) return G[j].def; }
+    return null;
   }
-  if(terms.length<3) return renderDefBullets(str);
-  var html='<div class="def-kw-chips">';
-  for(var i=0;i<terms.length;i++) html+='<span class="def-kw-chip">'+escapeHtml(terms[i])+'</span>';
+  var rows=[], seen={};
+  // 1) concise English-term (Japanese-meaning) pairs taken from the JA definition
+  var pp=/\*\*([A-Za-z][A-Za-z0-9 \/&'\-]*?)\*\*\s*[（(]([^（）()]{1,40})[）)]/g, pm;
+  while((pm=pp.exec(defJA||''))!==null){
+    var t=pm[1].trim(), k=t.toLowerCase();
+    if(!t||seen[k]) continue; seen[k]=1;
+    rows.push({term:t, def:pm[2].trim()});
+  }
+  // 2) add remaining bold keywords from defEN that have a glossary meaning
+  var bb=/\*\*([^*]+)\*\*/g, bm;
+  while((bm=bb.exec(str))!==null){
+    var bt=bm[1].trim(), bk=bt.toLowerCase();
+    if(!bt||seen[bk]) continue;
+    var g=gloss(bt);
+    if(g){ seen[bk]=1; rows.push({term:bt, def:g}); }
+  }
+  if(rows.length<2) return renderDefBullets(str);
+  var html='<div class="def-kw-defs">';
+  for(var r=0;r<rows.length;r++){
+    html+='<div class="def-kw-row"><span class="kw">'+escapeHtml(rows[r].term)+'</span><span class="kw-def">'+escapeHtml(rows[r].def)+'</span></div>';
+  }
   html+='</div>';
   return html;
 }
@@ -315,7 +336,7 @@ function renderChapterContent(ch) {
     if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 Scene</div><div>' + MATH(renderMd(c.scene)) + '</div></div>';
     if (c.compare) html += '<div style="margin:12px 0;">' + MATH(renderCompareTable(c.compare)) + '</div>';
     if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ Punchline</div><div class="punch-text">' + MATH(renderMd(c.punchline)) + '</div></div>';
-    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN) — keywords</div><div>' + MATH(renderDefKeywords(c.defEN)) + '</div></div>';
+    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN) — keywords</div><div>' + MATH(renderDefKeywords(c.defEN, c.defJA)) + '</div></div>';
     if (c.defJA) html += '<div class="def-block"><div class="section-label">📝 定義 (JA)</div><div>' + MATH(renderMd(c.defJA)) + '</div></div>';
     if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example</div><div>' + MATH(renderMd(c.example)) + '</div></div>';
     if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 Why It Matters</div><div>' + MATH(renderMd(c.whyNeeded)) + '</div></div>';
