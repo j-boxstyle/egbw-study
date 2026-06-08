@@ -95,6 +95,8 @@ main{max-width:1400px;margin:0 auto;padding:14px 22px}
 #view-text .punch-block{border-left:4px solid #eab308;background:rgba(234,179,8,.08);padding:12px 14px;margin:10px 0;border-radius:0 8px 8px 0}
 #view-text .punch-text{font-size:25px;font-weight:700;color:#eab308;line-height:1.6}
 #view-text .def-block{padding:2px 0;margin:10px 0;line-height:1.8;font-size:22px}
+#view-text .def-kw-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
+#view-text .def-kw-chip{background:rgba(234,179,8,.12);border:1px solid rgba(234,179,8,.4);color:#fbbf24;font-weight:600;font-size:19px;padding:6px 14px;border-radius:10px;line-height:1.3}
 #view-text .def-kw-list{margin:4px 0;padding-left:0;list-style:none}
 #view-text .def-kw-list li{position:relative;padding:7px 0 7px 26px;line-height:1.55;border-bottom:1px solid rgba(226,232,240,.08)}
 #view-text .def-kw-list li:last-child{border-bottom:none}
@@ -802,6 +804,22 @@ window.EXAM_PROBLEMS=[{"id": "ep_w1_1", "week": 1, "title": "Externality, Tax an
 function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function renderConceptDiagram(){ return ''; } // no SVG diagrams in EGBW build
 function MATH(html){ return (window.renderMathInHtml ? window.renderMathInHtml(html) : html); }
+// English definition → keyword chips (the bold key terms only). Falls back to sentence
+// bullets when there are too few bold terms, and to the rich renderer for tables/code.
+function renderDefKeywords(str){
+  if(!str) return '';
+  if(/```|(\n\s*\|)/.test(str)) return renderDefEN(str);
+  var seen={}, terms=[], m, re=/\*\*([^*]+)\*\*/g;
+  while((m=re.exec(str))!==null){
+    var t=m[1].trim(); var k=t.toLowerCase();
+    if(t && !seen[k]){ seen[k]=1; terms.push(t); }
+  }
+  if(terms.length<3) return renderDefBullets(str);
+  var html='<div class="def-kw-chips">';
+  for(var i=0;i<terms.length;i++) html+='<span class="def-kw-chip">'+escapeHtml(terms[i])+'</span>';
+  html+='</div>';
+  return html;
+}
 // English definition → scannable keyword bullets (one per sentence). Falls back to the
 // rich renderer when the source contains a table or code block.
 function renderDefBullets(str){
@@ -1097,7 +1115,7 @@ function renderChapterContent(ch) {
     if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 Scene</div><div>' + MATH(renderMd(c.scene)) + '</div></div>';
     if (c.compare) html += '<div style="margin:12px 0;">' + MATH(renderCompareTable(c.compare)) + '</div>';
     if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ Punchline</div><div class="punch-text">' + MATH(renderMd(c.punchline)) + '</div></div>';
-    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN)</div><div>' + MATH(renderDefBullets(c.defEN)) + '</div></div>';
+    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN) — keywords</div><div>' + MATH(renderDefKeywords(c.defEN)) + '</div></div>';
     if (c.defJA) html += '<div class="def-block"><div class="section-label">📝 定義 (JA)</div><div>' + MATH(renderMd(c.defJA)) + '</div></div>';
     if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example</div><div>' + MATH(renderMd(c.example)) + '</div></div>';
     if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 Why It Matters</div><div>' + MATH(renderMd(c.whyNeeded)) + '</div></div>';
