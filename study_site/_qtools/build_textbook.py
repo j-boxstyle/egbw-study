@@ -38,6 +38,20 @@ for i,c in enumerate(concepts):
     while cid in seen: cid=base+'_'+str(n); n+=1
     c['id']=cid; seen.add(cid)
 
+# attach per-term EN->JA definitions (defs) from tb_w*_defs.json, keyed by concept id
+defs_map={}
+for f in sorted(glob.glob(os.path.join(HERE,'tb_w*_defs.json'))):
+    d=json.load(open(f,encoding='utf-8'))
+    for k,v in d.items(): defs_map[k]=v
+attached=0
+for c in concepts:
+    dv=defs_map.get(c['id'])
+    if isinstance(dv,list) and dv:
+        # keep only valid entries with t/en/ja
+        clean=[{'t':e.get('t',''),'en':e.get('en',''),'ja':e.get('ja','')} for e in dv if e.get('t') and e.get('en') and e.get('ja')]
+        if clean: c['defs']=clean; attached+=1
+print('concepts with defs attached:',attached,'/',len(concepts),'| total def entries:',sum(len(c.get('defs',[])) for c in concepts))
+
 # dedup glossary by lowercased term, keep first; sort alphabetically
 gseen=set(); gl=[]
 for g in glossary:

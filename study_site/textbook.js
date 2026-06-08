@@ -4,6 +4,8 @@
 function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function renderConceptDiagram(){ return ''; } // no SVG diagrams in EGBW build
 function MATH(html){ return (window.renderMathInHtml ? window.renderMathInHtml(html) : html); }
+// inline formatter for English fields: escape + **bold** + *em*
+function enFmt(s){ return escapeHtml(s||'').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*\n]+)\*/g,'<em>$1</em>'); }
 // English definition → keyword chips (the bold key terms only). Falls back to sentence
 // bullets when there are too few bold terms, and to the rich renderer for tables/code.
 // Key Terms section: English term — concise meaning pairs. Returns '' when too sparse.
@@ -332,31 +334,32 @@ function renderChapterContent(ch) {
     html += '<div class="concept-header"><div class="concept-num">' + (idx + 1) + '</div><div class="concept-title">' + escapeHtml(c.name) + '</div>';
     if (c.star) html += '<div class="star-badge">★ 試験重要</div>';
     html += '</div>';
-    html += renderInlineGlossary(c.id, c.name);
-    // English one-line hook
-    if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ In one line (EN)</div><div class="punch-text">' + MATH(renderMd(c.punchline)) + '</div></div>';
-    // ① ENGLISH explanation — always first (this is an English test)
-    if (c.defEN) html += '<div class="def-section en"><div class="section-label en">🇬🇧 English Definition</div><div>' + MATH(renderDefBullets(c.defEN)) + '</div></div>';
-    if (c.compare) html += '<div style="margin:10px 0;">' + MATH(renderCompareTable(c.compare)) + '</div>';
-    // ② JAPANESE explanation — right after, long & clear
-    if (c.defJA) html += '<div class="def-section ja"><div class="section-label ja">🇯🇵 日本語の説明</div><div>' + MATH(renderMd(c.defJA)) + '</div></div>';
-    // ③ Key vocabulary (term — meaning)
-    var kt = keyTermsHtml(c.defEN, c.defJA);
-    if (kt) html += '<div class="def-section kw"><div class="section-label" style="color:#eab308;">🔑 Key Terms（重要単語）</div>' + MATH(kt) + '</div>';
-    // ④ Example (EN)
+    // CORE: per-term definitions — each term: 🇬🇧 English first (it's an English test), then 🇯🇵 Japanese.
+    if (c.defs && c.defs.length) {
+      html += '<div class="termdefs">';
+      for (var di = 0; di < c.defs.length; di++) {
+        var d = c.defs[di];
+        html += '<div class="termdef">';
+        html += '<div class="td-term">' + MATH(enFmt(d.t)) + '</div>';
+        html += '<div class="td-en"><span class="fl">🇬🇧</span><span>' + MATH(enFmt(d.en)) + '</span></div>';
+        html += '<div class="td-ja"><span class="fl">🇯🇵</span><span>' + MATH(renderMd(d.ja)) + '</span></div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    } else {
+      // fallback for any concept lacking defs
+      if (c.defEN) html += '<div class="def-section en"><div class="section-label en">🇬🇧 English Definition</div><div>' + MATH(renderDefBullets(c.defEN)) + '</div></div>';
+      if (c.defJA) html += '<div class="def-section ja"><div class="section-label ja">🇯🇵 日本語の説明</div><div>' + MATH(renderMd(c.defJA)) + '</div></div>';
+    }
+    if (c.compare) html += '<div style="margin:12px 0;">' + MATH(renderCompareTable(c.compare)) + '</div>';
+    // Example (EN)
     if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example (EN)</div><div>' + MATH(renderMd(c.example)) + '</div></div>';
-    // ⑤ Common mistakes (JA)
+    // Common mistakes (JA)
     if (c.mistakes && c.mistakes.length) {
       html += '<div class="mistakes-block"><div class="section-label" style="color:#ef4444;">⚠️ よくある間違い</div>';
       for (var m = 0; m < c.mistakes.length; m++) html += '<div>• ' + MATH(renderMd(c.mistakes[m])) + '</div>';
       html += '</div>';
     }
-    // ⑥ Why it matters (JA)
-    if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 なぜ重要か</div><div>' + MATH(renderMd(c.whyNeeded)) + '</div></div>';
-    // ⑦ Memorize hook (EN)
-    if (c.memorize) html += '<div class="memorize-block"><div class="section-label">🧠 Memorize</div><div class="memorize-text">' + escapeHtml(c.memorize) + '</div></div>';
-    // ⑧ Background scenario (JA) — supporting, at the bottom
-    if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 背景イメージ</div><div>' + MATH(renderMd(c.scene)) + '</div></div>';
     html += '</div>';
     if ((idx + 1) % 2 === 0) html += renderInlineQuiz(ch, idx);
   }
