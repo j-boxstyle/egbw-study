@@ -20,6 +20,11 @@
 #view-text .punch-block{border-left:4px solid #eab308;background:rgba(234,179,8,.08);padding:12px 14px;margin:10px 0;border-radius:0 8px 8px 0}
 #view-text .punch-text{font-size:25px;font-weight:700;color:#eab308;line-height:1.6}
 #view-text .def-block{padding:2px 0;margin:10px 0;line-height:1.8;font-size:22px}
+#view-text .def-kw-list{margin:4px 0;padding-left:0;list-style:none}
+#view-text .def-kw-list li{position:relative;padding:7px 0 7px 26px;line-height:1.55;border-bottom:1px solid rgba(226,232,240,.08)}
+#view-text .def-kw-list li:last-child{border-bottom:none}
+#view-text .def-kw-list li::before{content:"▸";position:absolute;left:4px;top:6px;color:#60a5fa;font-weight:700}
+#view-text .def-kw-list strong{color:#fbbf24}
 #view-text .def-entry{line-height:1.8;padding:3px 0}
 #view-text .def-plain{padding:5px 0}
 #view-text .def-card{padding:8px 4px 12px;margin:12px 0;border-top:1px solid rgba(226,232,240,.14)}

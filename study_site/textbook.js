@@ -4,6 +4,26 @@
 function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function renderConceptDiagram(){ return ''; } // no SVG diagrams in EGBW build
 function MATH(html){ return (window.renderMathInHtml ? window.renderMathInHtml(html) : html); }
+// English definition → scannable keyword bullets (one per sentence). Falls back to the
+// rich renderer when the source contains a table or code block.
+function renderDefBullets(str){
+  if(!str) return '';
+  if(/```|(\n\s*\|)/.test(str)) return renderDefEN(str);
+  var parts=[];
+  str.split(/\n+/).forEach(function(line){
+    line=line.trim(); if(!line) return;
+    var re=/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g, m;
+    while((m=re.exec(line))!==null){ var s=m[0].trim(); if(s) parts.push(s); }
+  });
+  if(!parts.length) return renderDefEN(str);
+  var html='<ul class="def-kw-list">';
+  for(var i=0;i<parts.length;i++){
+    var s=escapeHtml(parts[i]).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
+    html+='<li>'+s+'</li>';
+  }
+  html+='</ul>';
+  return html;
+}
 
 // ---- renderMd (ported verbatim) ----
 function renderMd(str) {
@@ -279,7 +299,7 @@ function renderChapterContent(ch) {
     if (c.scene) html += '<div class="scene-block"><div class="section-label" style="color:#3b82f6;">🎬 Scene</div><div>' + MATH(renderMd(c.scene)) + '</div></div>';
     if (c.compare) html += '<div style="margin:12px 0;">' + MATH(renderCompareTable(c.compare)) + '</div>';
     if (c.punchline) html += '<div class="punch-block"><div class="section-label" style="color:#eab308;">⚡ Punchline</div><div class="punch-text">' + MATH(renderMd(c.punchline)) + '</div></div>';
-    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN)</div><div>' + MATH(renderDefEN(c.defEN)) + '</div></div>';
+    if (c.defEN) html += '<div class="def-block"><div class="section-label">📝 Definition (EN)</div><div>' + MATH(renderDefBullets(c.defEN)) + '</div></div>';
     if (c.defJA) html += '<div class="def-block"><div class="section-label">📝 定義 (JA)</div><div>' + MATH(renderMd(c.defJA)) + '</div></div>';
     if (c.example) html += '<div class="example-block"><div class="section-label" style="color:#22c55e;">💡 Example</div><div>' + MATH(renderMd(c.example)) + '</div></div>';
     if (c.whyNeeded) html += '<div class="why-block"><div class="section-label" style="color:#a855f7;">🔍 Why It Matters</div><div>' + MATH(renderMd(c.whyNeeded)) + '</div></div>';
